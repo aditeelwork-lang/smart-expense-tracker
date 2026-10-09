@@ -7,8 +7,9 @@
 // If there is saved data in the browser,
 // load it. Otherwise use an empty array.
 
-let transactions =
-    JSON.parse(localStorage.getItem("transactions")) || [];
+const API_URL = "http://127.0.0.1:5000/api/transactions";
+
+let transactions = [];
 
 
 // Chart variables
@@ -62,7 +63,6 @@ dateInput.value =
 // ==========================================
 
 function saveData() {
-
     localStorage.setItem(
         "transactions",
         JSON.stringify(transactions)
@@ -84,16 +84,27 @@ function formatCurrency(amount) {
 // DELETE TRANSACTION
 // ==========================================
 
-function deleteTransaction(id) {
 
-    transactions =
-        transactions.filter(
+async function deleteTransaction(id) {
+    try {
+        const response = await fetch(`${API_URL}/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to delete transaction");
+        }
+
+        transactions = transactions.filter(
             transaction => transaction.id !== id
         );
 
-    saveData();
+        updateUI();
 
-    updateUI();
+    } catch (error) {
+        console.error("Error deleting transaction:", error);
+        alert("Could not delete transaction. Please try again.");
+    }
 }
 
 
@@ -539,6 +550,34 @@ function updateCharts() {
 // UPDATE EVERYTHING
 // ==========================================
 
+
+async function loadTransactions() {
+    try {
+        const response = await fetch(API_URL);
+
+        if (!response.ok) {
+            throw new Error("Failed to load transactions");
+        }
+
+        const data = await response.json();
+
+        transactions = data.map(item => ({
+            id: item.id,
+            description: item.title,
+            amount: Number(item.amount),
+            type: item.type,
+            category: item.category,
+            date: item.transaction_date,
+            notes: item.description
+        }));
+
+        updateUI();
+
+    } catch (error) {
+        console.error("Error loading transactions:", error);
+        alert("Could not load transactions. Check whether the backend is running.");
+    }
+}
 function updateUI() {
 
     updateDashboard();
@@ -550,119 +589,54 @@ function updateUI() {
 
 
 // ==========================================
-// ADD TRANSACTION
-// ==========================================
 
-form.addEventListener(
-    "submit",
-    event => {
+form.addEventListener("submit", async event => {
+    event.preventDefault();
 
-        event.preventDefault();
+    const description = document.getElementById("description").value.trim();
+    const amount = Number.parseFloat(document.getElementById("amount").value);
+    const type = document.getElementById("type").value;
+    const category = document.getElementById("category").value;
+    const date = document.getElementById("date").value;
 
+    if (!description || !Number.isFinite(amount) || amount <= 0 || !date) {
+        alert("Please enter valid transaction details.");
+        return;
+    }
 
-        // Get form values
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                title: description,
+                amount: amount,
+                type: type,
+                category: category,
+                transaction_date: date,
+                description: ""
+            })
+        });
 
-        const description =
-            document
-                .getElementById("description")
-                .value
-                .trim();
-
-
-        const amount =
-            Number.parseFloat(
-                document
-                    .getElementById("amount")
-                    .value
-            );
-
-
-        const type =
-            document
-                .getElementById("type")
-                .value;
-
-
-        const category =
-            document
-                .getElementById("category")
-                .value;
-
-
-        const date =
-            document
-                .getElementById("date")
-                .value;
-
-
-        // Validate
-
-        if (
-            !description ||
-            !Number.isFinite(amount) ||
-            amount <= 0 ||
-            !date
-        ) {
-
-            return;
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Could not save transaction");
         }
 
-
-        // Create transaction
-
-        const transaction = {
-
-            id: Date.now(),
-
-            description: description,
-
-            amount: amount,
-
-            type: type,
-
-            category: category,
-
-            date: date
-        };
-
-
-        // Add to array
-
-        transactions.push(
-            transaction
-        );
-
-
-        // Save
-
-        saveData();
-
-
-        // Refresh app
-
-        updateUI();
-
-
-        // Reset form
+        // Reload the saved data from the backend
+        await loadTransactions();
 
         form.reset();
+        dateInput.value = new Date().toISOString().split("T")[0];
+        document.getElementById("description").focus();
 
-
-        // Put today's date back
-
-        dateInput.value =
-            new Date()
-                .toISOString()
-                .split("T")[0];
-
-
-        // Focus description
-
-        document
-            .getElementById("description")
-            .focus();
+    } catch (error) {
+        console.error("Add transaction error:", error);
+        alert("Could not save transaction: " + error.message);
     }
-);
+});
 
 
 // ==========================================
@@ -739,7 +713,5 @@ themeToggle.textContent =
 // ==========================================
 // START APPLICATION
 // ==========================================
-
 initCharts();
-
-updateUI();
+loadTransactions();
