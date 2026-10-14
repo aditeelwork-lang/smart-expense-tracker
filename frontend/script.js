@@ -1,6 +1,5 @@
 
 const API_URL = "https://smart-expense-tracker-60ia.onrender.com/api/transactions";
-
 let transactions = [];
 let categoryChart = null;
 let monthlyChart = null;
