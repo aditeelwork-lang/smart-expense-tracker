@@ -1,5 +1,5 @@
 
-const API_URL = "http://127.0.0.1:5000/api/transactions";
+const API_URL = "https://smart-expense-tracker-60ia.onrender.com/api/transactions";
 
 let transactions = [];
 let categoryChart = null;
